@@ -37,7 +37,7 @@ struct item {
 static char text[BUFSIZ] = "";
 static char *embed;
 static int bh, mw, mh;
-static int inputw = 0, promptw;
+static int inputw = 0, promptw, passwd = 0;
 static int lrpad; /* sum of left and right padding */
 static size_t cursor;
 static struct item *items = NULL;
@@ -153,17 +153,9 @@ drawmenu(void)
 	/* draw input field */
 	w = (lines > 0 || !matches) ? mw - x : inputw;
 
-//drw_setscheme(drw, scheme[SchemeNorm]);
-//drw_text(drw, x, 0, w, bh, lrpad / 2, text, 0);
-
 	w -= lrpad / 2;
 	x += lrpad / 2;
 
-//curpos = TEXTW(text) - TEXTW(&text[cursor]);
-//if ((curpos += lrpad / 2 - 1) < w) {
-//	drw_setscheme(drw, scheme[SchemeNorm]);
-//	drw_rect(drw, x + curpos, 2 + (bh-fh)/2, 2, fh - 4, 1, 0);
-//}
 	rcurlen = drw_fontset_getwidth(drw, text + cursor);
 	curlen = drw_fontset_getwidth(drw, text) - rcurlen;
 	curpos += curlen - oldcurlen;
@@ -172,9 +164,18 @@ drawmenu(void)
 	curpos = MIN(curpos, curlen);
 	oldcurlen = curlen;
 
+	char *input_text = text;
+	int text_len = strlen(text);
+	if (passwd && text_len > 0) {
+		// alloca (stack) will self free at function end
+		// set buffer to passwd_char
+		input_text = alloca(sizeof(text));
+		memset(input_text, passwd_char, text_len);
+	}
+
 	drw_setscheme(drw, scheme[SchemeNorm]);
-	drw_text_align(drw, x, 0, curpos, bh, text, cursor, AlignR);
-	drw_text_align(drw, x + curpos, 0, w - curpos, bh, text + cursor, strlen(text) - cursor, AlignL);
+	drw_text_align(drw, x, 0, curpos, bh, input_text, cursor, AlignR);
+	drw_text_align(drw, x + curpos, 0, w - curpos, bh, input_text + cursor, strlen(input_text) - cursor, AlignL);
 	drw_rect(drw, x + curpos - 1, 2, 2, bh - 4, 1, 0);
 
 
@@ -552,6 +553,11 @@ readstdin(void)
 	size_t i, imax = 0, size = 0;
 	unsigned int tmpmax = 0;
 
+	if (passwd) {
+		inputw = lines = 0;
+		return;
+	}
+
 	/* read each line from stdin and add it to the item list */
 	for (i = 0; fgets(buf, sizeof buf, stdin); i++) {
 		if (i + 1 >= size / sizeof *items)
@@ -731,7 +737,7 @@ setup(void)
 static void
 usage(void)
 {
-	fputs("usage: dmenu [-bfiv] [-l lines] [-p prompt] [-fn font] [-m monitor]\n"
+	fputs("usage: dmenu [-bfivP] [-l lines] [-p prompt] [-fn font] [-m monitor]\n"
 	      "             [-h height]\n"
 	      "             [-nb color] [-nf color] [-sb color] [-sf color] [-w windowid]\n", stderr);
 	exit(1);
@@ -748,15 +754,17 @@ main(int argc, char *argv[])
 		if (!strcmp(argv[i], "-v")) {      /* prints version information */
 			puts("dmenu-"VERSION);
 			exit(0);
-		} else if (!strcmp(argv[i], "-b")) /* appears at the bottom of the screen */
+		} else if (!strcmp(argv[i], "-b")) { /* appears at the bottom of the screen */
 			topbar = 0;
-		else if (!strcmp(argv[i], "-f"))   /* grabs keyboard before reading stdin */
+		} else if (!strcmp(argv[i], "-f")) {  /* grabs keyboard before reading stdin */
 			fast = 1;
-		else if (!strcmp(argv[i], "-c"))   /* centers dmenu on screen */
+		} else if (!strcmp(argv[i], "-c")) {  /* centers dmenu on screen */
 			centered = 1;
-		else if (!strcmp(argv[i], "-i")) { /* case-insensitive item matching */
+		} else if (!strcmp(argv[i], "-i")) { /* case-insensitive item matching */
 			fstrncmp = strncasecmp;
 			fstrstr = cistrstr;
+		} else if (!strcmp(argv[i], "-P")) {  /* is the input a password */
+			passwd = 1;
 		} else if (i + 1 == argc)
 			usage();
 		/* these options take one argument */
