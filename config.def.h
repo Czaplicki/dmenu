@@ -4,7 +4,9 @@
 static int topbar = 1;                      /* -b  option; if 0, dmenu appears at bottom     */
 static int centered = 1;                    /* -c option; centers dmenu on screen */
 static int min_width = 700;                 /* minimum width when centered */
-static int passwd_char = '*';				/* -p option's char used as char replacment */
+static int passwd_char = '*';				/* -p option; char used as char replacment */
+static double dim_opacity = 0.5;			/* -d option; if 0, no dimming takes place */
+
 /* -fn option overrides fonts[0]; default X11 font or font set */
 static const char *fonts[] = {
 	"monospace:size=11"
@@ -15,6 +17,7 @@ static const char *colors[SchemeLast][2] = {
 	[SchemeNorm] = { "#bbbbbb", "#222222" },
 	[SchemeSel] = { "#eeeeee", "#77001a" },
 	[SchemeOut] = { "#000000", "#00ffff" },
+	[SchemeDim] = { "#000000", "#000000" },
 };
 /* -l option; if nonzero, dmenu uses vertical list with given number of lines */
 static unsigned int lines      = 18;
