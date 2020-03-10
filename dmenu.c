@@ -164,18 +164,21 @@ drawmenu(void)
 	curpos = MIN(curpos, curlen);
 	oldcurlen = curlen;
 
-	char *input_text = text;
+	drw_setscheme(drw, scheme[SchemeNorm]);
+
 	int text_len = strlen(text);
 	if (passwd && text_len > 0) {
-		// alloca (stack) will self free at function end
-		// set buffer to passwd_char
-		input_text = alloca(sizeof(text));
+		char *input_text = alloca(sizeof(text));
 		memset(input_text, passwd_char, text_len);
+		input_text[text_len] = NULL;
+		drw_text_align(drw, x, 0, curpos, bh, input_text, cursor, AlignR);
+		drw_text_align(drw, x + curpos, 0, w - curpos, bh, input_text + cursor, strlen(input_text) - cursor, AlignL);
+		//free(input_text);
+	} else {
+		drw_text_align(drw, x, 0, curpos, bh, text, cursor, AlignR);
+		drw_text_align(drw, x + curpos, 0, w - curpos, bh, text + cursor, strlen(text) - cursor, AlignL);
 	}
 
-	drw_setscheme(drw, scheme[SchemeNorm]);
-	drw_text_align(drw, x, 0, curpos, bh, input_text, cursor, AlignR);
-	drw_text_align(drw, x + curpos, 0, w - curpos, bh, input_text + cursor, strlen(input_text) - cursor, AlignL);
 	drw_rect(drw, x + curpos - 1, 2, 2, bh - 4, 1, 0);
 
 
