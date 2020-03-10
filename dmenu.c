@@ -26,7 +26,7 @@
 #define TEXTW(X)              (drw_fontset_getwidth(drw, (X)) + lrpad)
 
 /* enums */
-enum { SchemeNorm, SchemeSel, SchemeOut, SchemeLast }; /* color schemes */
+enum { SchemeNorm, SchemeSel, SchemeOut, SchemeDim, SchemeLast }; /* color schemes */
 
 struct item {
 	char *text;
@@ -47,7 +47,7 @@ static int mon = -1, screen;
 
 static Atom clip, utf8;
 static Display *dpy;
-static Window root, parentwin, win;
+static Window root, parentwin, win, dim;
 static XIC xic;
 
 static Drw *drw;
@@ -164,18 +164,21 @@ drawmenu(void)
 	curpos = MIN(curpos, curlen);
 	oldcurlen = curlen;
 
-	char *input_text = text;
+	drw_setscheme(drw, scheme[SchemeNorm]);
+
 	int text_len = strlen(text);
 	if (passwd && text_len > 0) {
-		// alloca (stack) will self free at function end
-		// set buffer to passwd_char
-		input_text = alloca(sizeof(text));
+		char *input_text = alloca(sizeof(text));
 		memset(input_text, passwd_char, text_len);
+		input_text[text_len] = NULL;
+		drw_text_align(drw, x, 0, curpos, bh, input_text, cursor, AlignR);
+		drw_text_align(drw, x + curpos, 0, w - curpos, bh, input_text + cursor, strlen(input_text) - cursor, AlignL);
+		//free(input_text);
+	} else {
+		drw_text_align(drw, x, 0, curpos, bh, text, cursor, AlignR);
+		drw_text_align(drw, x + curpos, 0, w - curpos, bh, text + cursor, strlen(text) - cursor, AlignL);
 	}
 
-	drw_setscheme(drw, scheme[SchemeNorm]);
-	drw_text_align(drw, x, 0, curpos, bh, input_text, cursor, AlignR);
-	drw_text_align(drw, x + curpos, 0, w - curpos, bh, input_text + cursor, strlen(input_text) - cursor, AlignL);
 	drw_rect(drw, x + curpos - 1, 2, 2, bh - 4, 1, 0);
 
 
@@ -703,8 +706,31 @@ setup(void)
 	inputw = MIN(inputw, mw/3);
 	match();
 
-	/* create menu window */
 	swa.override_redirect = True;
+
+	/* create dim window */
+	if (dim_opacity > 0) {
+		swa.background_pixel = scheme[SchemeDim][ColBg].pixel;
+		swa.event_mask = ExposureMask | KeyPressMask | VisibilityChangeMask;
+
+		XWindowAttributes attr;
+		XGetWindowAttributes(drw->dpy, parentwin, &attr);
+
+		dim = XCreateWindow(drw->dpy, parentwin, attr.x, attr.y, attr.width, attr.height, 0,
+			DefaultDepth(drw->dpy, screen), CopyFromParent,
+			DefaultVisual(drw->dpy, screen),
+			CWOverrideRedirect | CWBackPixel | CWEventMask, &swa);
+
+	    dim_opacity = MIN(MAX(dim_opacity, 0), 1);
+	    unsigned int dim_opacity_set = (unsigned int)(dim_opacity * 0xffffffff);
+	    XChangeProperty(drw->dpy, dim, XInternAtom(drw->dpy, "_NET_WM_WINDOW_OPACITY", False),
+	        XA_CARDINAL, 32, PropModeReplace,
+	        (unsigned char *) &dim_opacity_set, 1L);
+
+    	XMapRaised(drw->dpy, dim);
+	}
+
+	/* create menu window */
 	swa.background_pixel = scheme[SchemeNorm][ColBg].pixel;
 	swa.event_mask = ExposureMask | KeyPressMask | VisibilityChangeMask;
 	win = XCreateWindow(dpy, parentwin, x, y, mw, mh, 0,
@@ -768,13 +794,16 @@ main(int argc, char *argv[])
 		} else if (i + 1 == argc)
 			usage();
 		/* these options take one argument */
-		else if (!strcmp(argv[i], "-l"))   /* number of lines in vertical list */
+		else if (!strcmp(argv[i], "-l")) {	/* number of lines in vertical list */
 			lines = atoi(argv[++i]);
-		else if (!strcmp(argv[i], "-m"))
+		} else if (!strcmp(argv[i], "-m")) {
 			mon = atoi(argv[++i]);
-		else if (!strcmp(argv[i], "-p"))   /* adds prompt to left of input field */
+		} else if (!strcmp(argv[i], "-p")) {	/* adds prompt to left of input field */
 			prompt = argv[++i];
-		else if (!strcmp(argv[i], "-fn"))  /* font or font set */
+		} else if (!strcmp(argv[i], "-d")) {	/* adds prompt to left of input field */
+			dim_opacity = strtod(argv[++i], NULL );
+		}
+		else if (!strcmp(argv[i], "-fn")) /* font or font set */
 			fonts[0] = argv[++i];
 		else if(!strcmp(argv[i], "-h")) { /* minimum height of one menu line */
 			lineheight = atoi(argv[++i]);
